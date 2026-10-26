@@ -64,31 +64,29 @@ class StuttgartParser(LibraryParser):
 
     @classmethod
     def _parse_metadata(cls, data: Any, entry: Dict[str, Any]) -> None:
-        """Parse metadata (title, etc.) from the info table."""
-        tab = data.find("table", {"class": "gi"})
-        if tab is None:
-            return
+        """Parse metadata from all info tables into entry."""
+        for table in data.find_all("table", class_="gi"):
+            for row in table.find_all("tr"):
+                label_elem = row.find("th")
+                value_elem = row.find("td")
 
-        for row in tab.find_all("tr"):
-            try:
-                right_elem = row.find("td", {"class": "spalterechts"})
-                left_elem = row.find("th")
-                if right_elem is None or left_elem is None:
+                # Ignore incomplete or non-metadata rows, such as the copy-link row.
+                if label_elem is None or value_elem is None:
                     continue
 
-                right = right_elem.get_text().strip()
-                left = left_elem.get_text().strip()
+                label = label_elem.get_text(" ", strip=True)
+                value = value_elem.get_text(" ", strip=True)
 
-                if left.startswith("Titel"):
-                    left = "Titel"
-                    try:
-                        entry["Titel"], entry["TitelExtra"] = right.replace("Titel ", "").split(" / ")
-                    except ValueError:
-                        entry["Titel"] = right
-                elif left:
-                    entry[left] = right
-            except Exception:
-                pass
+                if not label or not value:
+                    continue
+
+                if label == "Titel":
+                    title, separator, extra = value.partition(" / ")
+                    entry["Titel"] = title.strip()
+                    if separator:
+                        entry["TitelExtra"] = extra.strip()
+                else:
+                    entry[label] = value
 
     @classmethod
     def _parse_holdings(cls, data: Any) -> List[Dict[str, Any]]:
